@@ -11,30 +11,30 @@ export class CategoryController {
   @Post()
   @ApiOperation({ summary: 'Kategoriya yaratish' })
   async create(@Body() dto: CreateCategoryDto) {
-    return await this.categoryService.create(dto);
+    return this.categoryService.create(dto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Barcha kategoriyalarni olish' })
+  @ApiOperation({ summary: 'Barcha kategoriyalarni olish (productlar bilan)' })
   async findAll() {
-    return await this.categoryService.findAll();
+    return this.categoryService.findAll();
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Bitta kategoriyani olish' })
   async findOne(@Param('id') id: string) {
-    return await this.categoryService.findOne(id);
+    return this.categoryService.findOne(id);
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Kategoriyani yangilash' })
   async update(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
-    return await this.categoryService.update(id, dto);
+    return this.categoryService.update(id, dto);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Kategoriyani o‘chirish' })
   async delete(@Param('id') id: string) {
-    return await this.categoryService.delete(id);
+    return this.categoryService.delete(id);
   }
 }

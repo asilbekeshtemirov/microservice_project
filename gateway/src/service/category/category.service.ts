@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { CategoryClient } from './category.client';
 import { ProductClient } from '../product/product.client';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto';
@@ -12,58 +12,101 @@ export class CategoryService {
   ) {}
 
   async create(dto: CreateCategoryDto) {
-    return firstValueFrom(
-      this.client.getClient().send({ cmd: 'create-category' }, dto),
-    );
+    try {
+      return await firstValueFrom(
+        this.client.getClient().send({ cmd: 'create-category' }, dto),
+      );
+    } catch (err) {
+      throw new InternalServerErrorException('Kategoriya yaratishda xatolik yuz berdi');
+    }
   }
 
   async findAll() {
-    const res: any[] = [];
-  
-    const categories = await firstValueFrom(
-      this.client.getClient().send({ cmd: 'get-categories' }, {}),
-    );
-  
-    console.log('Categories from service:', categories);
-  
-    const categoriesList = Array.isArray(categories) ? categories : categories.data;
-  
-    for (const category of categoriesList) {
-      console.log('Processing category:', category);
-  
-      const products = await firstValueFrom(
-        this.productClient.getClient().send({ cmd: 'get_products_by_category' }, category._id),
+    try {
+      const categories = await firstValueFrom(
+        this.client.getClient().send({ cmd: 'get-categories' }, {}),
       );
   
-      console.log(`Products for category ${category._id}:`, products);
+      const categoriesList = Array.isArray(categories)
+        ? categories
+        : categories?.data ?? [];
   
-      res.push({ ...category, products });
-      console.log('Processing category:', products);
-
+      const result = await Promise.all(
+        categoriesList.map(async (category: any) => {
+          const products = await firstValueFrom(
+            this.productClient.getClient().send(
+              { cmd: 'get_products_by_category' },
+              category._id,
+            ),
+          );
+          console.log(products);
+          
+          return {
+            ...category,
+            products,
+          };
+        }),
+      );
+  
+      return {
+        count: result.length,
+        data: result,
+      };
+    } catch (err) {
+      console.error('Category + Products xatosi:', err);
+      throw new InternalServerErrorException('Kategoriyalarni olishda xatolik yuz berdi');
     }
-  
-    return {
-      count: res.length,
-      data: res,
-    };
   }
   
 
+
   async findOne(id: string) {
-    return firstValueFrom(
-      this.client.getClient().send({ cmd: 'get-category' }, id),
-    );
+    try {
+      return await firstValueFrom(
+        this.client.getClient().send({ cmd: 'get-category' }, id),
+      );
+    } catch (err) {
+      throw new InternalServerErrorException(`Kategoriya topilmadi: ${id}`);
+    }
   }
 
   async update(id: string, dto: UpdateCategoryDto) {
-    return firstValueFrom(
-      this.client.getClient().send({ cmd: 'update-category' }, { id, dto }),
-    );
+    try {
+      return await firstValueFrom(
+        this.client.getClient().send({ cmd: 'update-category' }, { id, dto }),
+      );
+    } catch (err) {
+      throw new InternalServerErrorException(`Kategoriya yangilanishida xatolik: ${id}`);
+    }
   }
 
   async delete(id: string) {
-    return firstValueFrom(
-      this.client.getClient().send({ cmd: 'delete-category' }, id),
-    );
+    try {
+      const category = await firstValueFrom(
+        this.client.getClient().send({ cmd: 'get-category' }, id),
+      );
+
+      if (!category) {
+        throw new NotFoundException('Kategoriya topilmadi');
+      }
+
+      try {
+        await firstValueFrom(
+          this.productClient.getClient().send({ cmd: 'delete_products_by_category' }, id),
+        );
+      } catch (err) {
+        console.error('Kategoriya mahsulotlarini o‘chirishda xato:', err);
+      }
+
+      await firstValueFrom(
+        this.client.getClient().send({ cmd: 'delete-category' }, id),
+      );
+
+      return { message: 'Kategoriya muvaffaqiyatli o‘chirildi' };
+
+    } catch (err) {
+      console.error(`Kategoriya o‘chirishda xatolik: ${id}`, err);
+      throw new InternalServerErrorException(`Kategoriya o‘chirishda xatolik yuz berdi`);
+    }
   }
 }
